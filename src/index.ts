@@ -14,7 +14,7 @@ app.post("/identify", async (req, res) => {
     return res.status(400).json({ error: "Provide email or phoneNumber" });
   }
 
-  // 1. Find existing contacts matching email or phone
+ 
   const matchedContacts = await prisma.contact.findMany({
     where: {
       OR: [
@@ -27,7 +27,7 @@ app.post("/identify", async (req, res) => {
 
   let primaryContact;
   if (matchedContacts.length === 0) {
-    // 2. No matches → new primary
+   
     primaryContact = await prisma.contact.create({
       data: {
         email,
@@ -36,12 +36,12 @@ app.post("/identify", async (req, res) => {
       }
     });
   } else {
-    // 3. Determine the oldest primary
+   
     const primaries = matchedContacts.filter(c => c.linkPrecedence === "primary");
     primaries.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     primaryContact = primaries[0];
 
-    // 4. Merge multiple primaries
+    
     for (const p of primaries.slice(1)) {
       await prisma.contact.update({
         where: { id: p.id },
@@ -52,7 +52,7 @@ app.post("/identify", async (req, res) => {
       });
     }
 
-    // 5. Check if current email/phone is already part of linked contacts
+    
     const allRelated = await prisma.contact.findMany({
       where: {
         OR: [
@@ -77,7 +77,7 @@ app.post("/identify", async (req, res) => {
     }
   }
 
-  // 6. Build final response
+  
   const allRelatedContacts = await prisma.contact.findMany({
     where: {
       OR: [
