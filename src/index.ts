@@ -14,7 +14,7 @@ app.post("/identify", async (req, res) => {
     return res.status(400).json({ error: "Provide email or phoneNumber" });
   }
 
-  // Step 1: Find all contacts that match by email OR phone
+  
   const matchedContacts = await prisma.contact.findMany({
     where: {
       OR: [
@@ -28,7 +28,7 @@ app.post("/identify", async (req, res) => {
   let primaryContact;
 
   if (matchedContacts.length === 0) {
-    // Step 2: If no match, create a new primary
+    
     primaryContact = await prisma.contact.create({
       data: {
         email,
@@ -37,14 +37,14 @@ app.post("/identify", async (req, res) => {
       },
     });
   } else {
-    // Step 3: Gather all unique contacts linked through matched ones
+   
     const allIds = matchedContacts.map((c) =>
       c.linkPrecedence === "primary" ? c.id : c.linkedId
     );
 
     const uniquePrimaryIds = [...new Set(allIds)];
 
-    // Fetch all related contacts across these primary IDs
+    
     const allRelated = await prisma.contact.findMany({
       where: {
         OR: [
@@ -55,12 +55,12 @@ app.post("/identify", async (req, res) => {
       orderBy: { createdAt: "asc" },
     });
 
-    // Step 4: Find the oldest primary
+   
     const primaries = allRelated.filter((c) => c.linkPrecedence === "primary");
     primaries.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     primaryContact = primaries[0];
 
-    // Step 5: Demote newer primaries to secondary
+    
     for (const p of primaries.slice(1)) {
       if (p.id !== primaryContact.id) {
         await prisma.contact.update({
@@ -73,7 +73,7 @@ app.post("/identify", async (req, res) => {
       }
     }
 
-    // Step 6: Ensure current email/phone are represented
+    
     const emailExists = allRelated.some((c) => c.email === email);
     const phoneExists = allRelated.some((c) => c.phoneNumber === phoneNumber);
 
@@ -89,7 +89,7 @@ app.post("/identify", async (req, res) => {
     }
   }
 
-  // Step 7: Build the consolidated response
+ 
   const finalContacts = await prisma.contact.findMany({
     where: {
       OR: [{ id: primaryContact.id }, { linkedId: primaryContact.id }],
