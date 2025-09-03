@@ -115,4 +115,10 @@ Run locally:
 ```json
 npm run dev
 ```
+<img width="1030" height="628" alt="image" src="https://github.com/user-attachments/assets/b602b9cc-8d62-40a7-b526-e02e63d459a4" />
+<img width="1033" height="579" alt="image" src="https://github.com/user-attachments/assets/9fb457b9-4244-4eca-a14f-d1e808dd4f6e" />
+<img width="1007" height="581" alt="image" src="https://github.com/user-attachments/assets/5e600ee0-02b3-41ac-bfb2-7f7a8dfcf84c" />
+<img width="1022" height="577" alt="image" src="https://github.com/user-attachments/assets/768673bc-0f33-41fd-a686-d0acbb2ea4b2" />
+<img width="1023" height="582" alt="image" src="https://github.com/user-attachments/assets/b880ba37-d159-4bf7-a407-a71d95ab2e40" />
+<img width="982" height="599" alt="image" src="https://github.com/user-attachments/assets/578a1768-17f0-4597-85db-bae2ca273a38" />
 
