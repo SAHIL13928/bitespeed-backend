@@ -14,93 +14,106 @@ app.post("/identify", async (req, res) => {
     return res.status(400).json({ error: "Provide email or phoneNumber" });
   }
 
- 
+  // Step 1: Find all contacts that match by email OR phone
   const matchedContacts = await prisma.contact.findMany({
     where: {
       OR: [
-        { email: email || undefined },
-        { phoneNumber: phoneNumber || undefined }
-      ]
+        email ? { email } : undefined,
+        phoneNumber ? { phoneNumber } : undefined,
+      ].filter(Boolean),
     },
-    orderBy: { createdAt: "asc" }
+    orderBy: { createdAt: "asc" },
   });
 
   let primaryContact;
+
   if (matchedContacts.length === 0) {
-   
+    // Step 2: If no match, create a new primary
     primaryContact = await prisma.contact.create({
       data: {
         email,
         phoneNumber,
-        linkPrecedence: "primary"
-      }
+        linkPrecedence: "primary",
+      },
     });
   } else {
-   
-    const primaries = matchedContacts.filter(c => c.linkPrecedence === "primary");
-    primaries.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-    primaryContact = primaries[0];
+    // Step 3: Gather all unique contacts linked through matched ones
+    const allIds = matchedContacts.map((c) =>
+      c.linkPrecedence === "primary" ? c.id : c.linkedId
+    );
 
-    
-    for (const p of primaries.slice(1)) {
-      await prisma.contact.update({
-        where: { id: p.id },
-        data: {
-          linkPrecedence: "secondary",
-          linkedId: primaryContact.id
-        }
-      });
-    }
+    const uniquePrimaryIds = [...new Set(allIds)];
 
-    
+    // Fetch all related contacts across these primary IDs
     const allRelated = await prisma.contact.findMany({
       where: {
         OR: [
-          { id: primaryContact.id },
-          { linkedId: primaryContact.id }
-        ]
-      }
+          { id: { in: uniquePrimaryIds } },
+          { linkedId: { in: uniquePrimaryIds } },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
     });
 
-    const emailExists = allRelated.some(c => c.email === email);
-    const phoneExists = allRelated.some(c => c.phoneNumber === phoneNumber);
+    // Step 4: Find the oldest primary
+    const primaries = allRelated.filter((c) => c.linkPrecedence === "primary");
+    primaries.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    primaryContact = primaries[0];
 
-    if (!emailExists || !phoneExists) {
+    // Step 5: Demote newer primaries to secondary
+    for (const p of primaries.slice(1)) {
+      if (p.id !== primaryContact.id) {
+        await prisma.contact.update({
+          where: { id: p.id },
+          data: {
+            linkPrecedence: "secondary",
+            linkedId: primaryContact.id,
+          },
+        });
+      }
+    }
+
+    // Step 6: Ensure current email/phone are represented
+    const emailExists = allRelated.some((c) => c.email === email);
+    const phoneExists = allRelated.some((c) => c.phoneNumber === phoneNumber);
+
+    if ((!emailExists && email) || (!phoneExists && phoneNumber)) {
       await prisma.contact.create({
         data: {
           email,
           phoneNumber,
           linkPrecedence: "secondary",
-          linkedId: primaryContact.id
-        }
+          linkedId: primaryContact.id,
+        },
       });
     }
   }
 
-  
-  const allRelatedContacts = await prisma.contact.findMany({
+  // Step 7: Build the consolidated response
+  const finalContacts = await prisma.contact.findMany({
     where: {
-      OR: [
-        { id: primaryContact.id },
-        { linkedId: primaryContact.id }
-      ]
+      OR: [{ id: primaryContact.id }, { linkedId: primaryContact.id }],
     },
-    orderBy: { createdAt: "asc" }
+    orderBy: { createdAt: "asc" },
   });
 
-  const emails = Array.from(new Set(allRelatedContacts.map(c => c.email).filter(Boolean)));
-  const phones = Array.from(new Set(allRelatedContacts.map(c => c.phoneNumber).filter(Boolean)));
-  const secondaryIds = allRelatedContacts
-    .filter(c => c.linkPrecedence === "secondary")
-    .map(c => c.id);
+  const emails = Array.from(
+    new Set(finalContacts.map((c) => c.email).filter(Boolean))
+  );
+  const phones = Array.from(
+    new Set(finalContacts.map((c) => c.phoneNumber).filter(Boolean))
+  );
+  const secondaryIds = finalContacts
+    .filter((c) => c.linkPrecedence === "secondary")
+    .map((c) => c.id);
 
   res.json({
     contact: {
-      primaryContatctId: primaryContact.id,
+      primaryContactId: primaryContact.id,
       emails,
       phoneNumbers: phones,
-      secondaryContactIds: secondaryIds
-    }
+      secondaryContactIds: secondaryIds,
+    },
   });
 });
 
